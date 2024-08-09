@@ -1,4 +1,4 @@
-use crate::{Constant, Generator, Range, Resource};
+use crate::{Constant, Generator};
 use rand::{distributions::uniform::SampleUniform, rngs::ThreadRng, Rng};
 
 /// A uniform distribution range generator.
@@ -30,69 +30,64 @@ where
     T: Clone + PartialOrd + SampleUniform,
 {
     /// Generates a random sample within the specified bounds.
-    fn generate(&mut self) -> T {
-        self.rng.gen_range(self.lb.clone()..self.ub.clone())
+    fn try_generate(&mut self) -> Option<T> {
+        if self.lb < self.ub {
+            Some(self.rng.gen_range(self.lb.clone()..self.ub.clone()))
+        } else {
+            None
+        }
     }
 }
 
-impl<T> Range<T> for UniformRange<T>
-where
-    T: Clone + PartialOrd + SampleUniform,
-{
-    fn set_range(&mut self, lb: T, rb: T) {
-        self.lb = lb;
-        self.ub = rb;
-    }
-}
-
-/// A resource generator that randomly samples from a collection of values.
+/// A generator that randomly samples from a collection of values.
 ///
 /// This structure maintains a collection of values and provides methods
 /// for adding, consuming, and sampling from these values.
-pub struct UniformResource<T> {
+pub struct UniformCollection<T> {
     values: Vec<T>,
     rng: ThreadRng,
 }
 
-impl<T> UniformResource<T> {
-    /// Creates a new `RandomSampleResource` with the given initial values.
+impl<T> UniformCollection<T>
+where
+    T: Eq,
+{
+    /// Creates a new `UniformCollection` with the given initial values.
     pub fn new(values: Vec<T>) -> Self {
         Self {
             values,
             rng: rand::thread_rng(),
         }
     }
+    /// Check if the collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    /// Adds a value to the collection.
+    pub fn add(&mut self, value: T) {
+        self.values.push(value);
+    }
+
+    /// Removes a value from the collection.
+    pub fn remove(&mut self, value: &T) {
+        if let Some(index) = self.values.iter().position(|v| v == value) {
+            self.values.remove(index);
+        }
+    }
 }
 
-impl<T> Generator<T> for UniformResource<T>
+impl<T> Generator<T> for UniformCollection<T>
 where
     T: Clone,
 {
     /// Generates a random sample from the resource.
-    fn generate(&mut self) -> T {
-        let index = self.rng.gen_range(0..self.values.len());
-        self.values[index].clone()
-    }
-}
-
-impl<T> Resource<T> for UniformResource<T>
-where
-    T: Clone + PartialEq,
-{
-    /// Check if the resource is empty.
-    fn is_empty(&self) -> bool {
-        self.values.is_empty()
-    }
-
-    /// Adds a value to the resource.
-    fn add(&mut self, value: T) {
-        self.values.push(value);
-    }
-
-    /// Consumes a value from the resource.
-    fn consume(&mut self, value: &T) {
-        if let Some(index) = self.values.iter().position(|v| v == value) {
-            self.values.remove(index);
+    fn try_generate(&mut self) -> Option<T> {
+        if self.values.is_empty() {
+            None
+        } else {
+            let index = self.rng.gen_range(0..self.values.len());
+            Some(self.values[index].clone())
         }
     }
 }
@@ -133,11 +128,11 @@ where
     G2: Generator<T>,
 {
     /// Generates a random sample from one of the generators.
-    fn generate(&mut self) -> T {
+    fn try_generate(&mut self) -> Option<T> {
         if self.rng.gen_bool(self.prob) {
-            self.gen1.generate()
+            self.gen1.try_generate()
         } else {
-            self.gen2.generate()
+            self.gen2.try_generate()
         }
     }
 }
