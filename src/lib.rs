@@ -39,4 +39,4 @@ where
     }
 }
 
-pub use random::{Switch, UniformCollection, UniformRange};
+pub use random::{RandomSwitch, SwitchConstant, UniformCollection, UniformRange};

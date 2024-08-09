@@ -93,22 +93,24 @@ where
 }
 
 /// A switch generator that randomly selects between two generators.
-pub struct Switch<G1, G2> {
+pub struct RandomSwitch<G1, G2> {
     gen1: G1,
     gen2: G2,
     prob: f64,
     rng: ThreadRng,
 }
 
-impl<G1, G2> Switch<G1, G2> {
-    /// Creates a new `Switch` with the specified generators.
-    pub fn new(gen1: G1, gen2: G2) -> Self {
-        Self {
+impl<G1, G2> RandomSwitch<G1, G2> {
+    /// Creates a new `RandomSwitch` with the specified generators.
+    pub fn new(gen1: G1, gen2: G2, prob: f64) -> Self {
+        let mut g = Self {
             gen1,
             gen2,
-            prob: 0.5,
+            prob,
             rng: rand::thread_rng(),
-        }
+        };
+        g.set_g1_prob(prob);
+        g
     }
     /// Set probability of selecting the first generator.
     pub fn set_g1_prob(&mut self, prob: f64) {
@@ -122,7 +124,7 @@ impl<G1, G2> Switch<G1, G2> {
     }
 }
 
-impl<T, G1, G2> Generator<T> for Switch<G1, G2>
+impl<T, G1, G2> Generator<T> for RandomSwitch<G1, G2>
 where
     G1: Generator<T>,
     G2: Generator<T>,
@@ -136,3 +138,6 @@ where
         }
     }
 }
+
+/// A generator that randomly chooses between a constant value and another generator.
+pub type SwitchConstant<T, G> = RandomSwitch<Constant<T>, G>;
