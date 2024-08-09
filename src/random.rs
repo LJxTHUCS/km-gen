@@ -136,6 +136,3 @@ where
         }
     }
 }
-
-/// A generator that switches between a constant value and another generator.
-pub type ConstOr<T, G> = Switch<Constant<T>, G>;

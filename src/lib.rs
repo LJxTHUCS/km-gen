@@ -1,6 +1,5 @@
+/// Random-based generators.
 mod random;
-
-pub use random::{ConstOr, Switch, UniformCollection, UniformRange};
 
 /// A generic value generator trait.
 pub trait Generator<T> {
@@ -24,3 +23,20 @@ where
         Some(self.0.clone())
     }
 }
+
+/// Default-or generator.
+///
+/// Generates the default value of type `T` if the wrapped generator fails.
+pub struct DefaultOr<T, G>(pub G, pub T);
+
+impl<T, G> Generator<T> for DefaultOr<T, G>
+where
+    G: Generator<T>,
+    T: Clone,
+{
+    fn try_generate(&mut self) -> Option<T> {
+        self.0.try_generate().or(Some(self.1.clone()))
+    }
+}
+
+pub use random::{Switch, UniformCollection, UniformRange};
