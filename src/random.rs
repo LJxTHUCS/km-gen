@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::{Constant, Generator};
 use bitflags::{Bits, Flags};
 use rand::{distributions::uniform::SampleUniform, rngs::ThreadRng, Rng};
@@ -41,18 +43,12 @@ where
 }
 
 /// A generator that randomly samples from a collection of values.
-///
-/// This structure maintains a collection of values and provides methods
-/// for adding, consuming, and sampling from these values.
 pub struct UniformCollection<T> {
     values: Vec<T>,
     rng: ThreadRng,
 }
 
-impl<T> UniformCollection<T>
-where
-    T: Eq,
-{
+impl<T> UniformCollection<T> {
     /// Creates a new `UniformCollection` with the given initial values.
     pub fn new(values: Vec<T>) -> Self {
         Self {
@@ -60,21 +56,10 @@ where
             rng: rand::thread_rng(),
         }
     }
+
     /// Check if the collection is empty.
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
-    }
-
-    /// Adds a value to the collection.
-    pub fn add(&mut self, value: T) {
-        self.values.push(value);
-    }
-
-    /// Removes a value from the collection.
-    pub fn remove(&mut self, value: &T) {
-        if let Some(index) = self.values.iter().position(|v| v == value) {
-            self.values.remove(index);
-        }
     }
 }
 
@@ -113,6 +98,7 @@ impl<G1, G2> RandomSwitch<G1, G2> {
         g.set_g1_prob(prob);
         g
     }
+
     /// Set probability of selecting the first generator.
     pub fn set_g1_prob(&mut self, prob: f64) {
         if prob < 0.0 {
@@ -149,18 +135,26 @@ pub type SwitchConstant<T, G> = RandomSwitch<Constant<T>, G>;
 pub struct RandomFlags<T> {
     rng: ThreadRng,
     prob: f64,
+    inclusion: T,
+    exclusion: T,
     constraints: Vec<(T, T)>,
 }
 
-impl<T> RandomFlags<T> {
+impl<T> RandomFlags<T>
+where
+    T: Flags,
+{
     /// Creates a new `RandomFlag` with the specific flag type.
     pub fn new(prob: f64) -> Self {
         Self {
             rng: rand::thread_rng(),
             prob,
+            inclusion: T::empty(),
+            exclusion: T::empty(),
             constraints: Vec::new(),
         }
     }
+
     /// Set probability of selecting a flag.
     pub fn set_prob(&mut self, prob: f64) {
         if prob < 0.0 {
@@ -171,17 +165,28 @@ impl<T> RandomFlags<T> {
             self.prob = prob;
         }
     }
+
+    /// Include some flags in the generator. Value generated will always include these flags.
+    pub fn include(&mut self, flags: T) {
+        self.inclusion = T::from_bits_truncate(self.inclusion.bits() | flags.bits());
+    }
+
+    /// Exclude some flags from the generator. Value generated will never include these flags.
+    pub fn exclude(&mut self, flags: T) {
+        self.exclusion = T::from_bits_truncate(self.exclusion.bits() | flags.bits());
+    }
+
     /// Add a constraint to the generator.
     ///
-    /// Constraint: If `flag1` is selected, then `flag2` must also be selected.
-    pub fn add_constraint(&mut self, flag1: T, flag2: T) {
+    /// If `flag1` is selected, then `flag2` must also be selected.
+    pub fn constraint(&mut self, flag1: T, flag2: T) {
         self.constraints.push((flag1, flag2));
     }
 }
 
 impl<T> Generator<T> for RandomFlags<T>
 where
-    T: Flags,
+    T: Flags + Debug,
 {
     /// Generates a random flag value.
     fn try_generate(&mut self) -> Option<T> {
@@ -191,13 +196,16 @@ where
                 value = value | flag.value().bits();
             }
         }
-        let flags = T::from_bits_truncate(value);
         // Check constraints
         for (flag1, flag2) in self.constraints.iter() {
-            if flags.bits() & flag1.bits() == flags.bits() {
+            if (value | flag1.bits()) == value {
                 value = value | flag2.bits();
             }
         }
+        // Check exclusions
+        value = value & !self.exclusion.bits();
+        // Check inclusions
+        value = value | self.inclusion.bits();
         Some(T::from_bits_truncate(value))
     }
 }
