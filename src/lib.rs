@@ -61,4 +61,4 @@ where
     }
 }
 
-pub use random::{RandomSwitch, SwitchConstant, UniformCollection, UniformRange};
+pub use random::{RandomFlags, RandomSwitch, SwitchConstant, UniformCollection, UniformRange};

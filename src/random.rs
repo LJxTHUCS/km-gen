@@ -1,4 +1,5 @@
 use crate::{Constant, Generator};
+use bitflags::{Bits, Flags};
 use rand::{distributions::uniform::SampleUniform, rngs::ThreadRng, Rng};
 
 /// A uniform distribution range generator.
@@ -141,3 +142,62 @@ where
 
 /// A generator that randomly chooses between a constant value and another generator.
 pub type SwitchConstant<T, G> = RandomSwitch<Constant<T>, G>;
+
+/// A generator that randomly generates a "flags" type value.
+///
+/// The generator will randomly select a flag from the flag set with a probability of `prob`.
+pub struct RandomFlags<T> {
+    rng: ThreadRng,
+    prob: f64,
+    constraints: Vec<(T, T)>,
+}
+
+impl<T> RandomFlags<T> {
+    /// Creates a new `RandomFlag` with the specific flag type.
+    pub fn new(prob: f64) -> Self {
+        Self {
+            rng: rand::thread_rng(),
+            prob,
+            constraints: Vec::new(),
+        }
+    }
+    /// Set probability of selecting a flag.
+    pub fn set_prob(&mut self, prob: f64) {
+        if prob < 0.0 {
+            self.prob = 0.0;
+        } else if prob > 1.0 {
+            self.prob = 1.0;
+        } else {
+            self.prob = prob;
+        }
+    }
+    /// Add a constraint to the generator.
+    ///
+    /// Constraint: If `flag1` is selected, then `flag2` must also be selected.
+    pub fn add_constraint(&mut self, flag1: T, flag2: T) {
+        self.constraints.push((flag1, flag2));
+    }
+}
+
+impl<T> Generator<T> for RandomFlags<T>
+where
+    T: Flags,
+{
+    /// Generates a random flag value.
+    fn try_generate(&mut self) -> Option<T> {
+        let mut value = T::Bits::EMPTY;
+        for flag in T::FLAGS.iter() {
+            if self.rng.gen_bool(self.prob) {
+                value = value | flag.value().bits();
+            }
+        }
+        let flags = T::from_bits_truncate(value);
+        // Check constraints
+        for (flag1, flag2) in self.constraints.iter() {
+            if flags.bits() & flag1.bits() == flags.bits() {
+                value = value | flag2.bits();
+            }
+        }
+        Some(T::from_bits_truncate(value))
+    }
+}
