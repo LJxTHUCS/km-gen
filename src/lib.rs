@@ -1,3 +1,5 @@
+//! Command and argument generators of Kernel Model Check.
+
 /// Random-based generators.
 mod random;
 
